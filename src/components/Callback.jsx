@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom"; // Import useNavigate from react-router-dom
 import UserDetails from "./UserDetails";
-import GenreSelect from "./GenreSelect";
-import SongsList from "./SongsList";
-import MoodForm from "./MoodForm";
 
 const Callback = () => {
     const [userData, setUserData] = useState(null);
-    const [genres, setGenres] = useState([]);
-    const [playlistsByGenre, setPlaylistsByGenre] = useState({});
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate(); // Create the navigate function
 
     useEffect(() => {
         const getAccessToken = async () => {
@@ -41,7 +38,6 @@ const Callback = () => {
                     }
 
                     const data = await response.json();
-                    // console.log("Access Token:", data.access_token);
                     localStorage.setItem("access_token", data.access_token);
 
                     const userResponse = await fetch("https://api.spotify.com/v1/me", {
@@ -56,19 +52,6 @@ const Callback = () => {
                     } else {
                         console.error("Error fetching user details:", await userResponse.json());
                     }
-
-                    const genresResponse = await fetch("https://api.spotify.com/v1/browse/categories", {
-                        headers: {
-                            Authorization: `Bearer ${data.access_token}`,
-                        },
-                    });
-
-                    if (genresResponse.ok) {
-                        const genresData = await genresResponse.json();
-                        setGenres(genresData.categories.items);
-                    } else {
-                        console.error("Error fetching genres:", await genresResponse.json());
-                    }
                 } catch (error) {
                     console.error("Error exchanging token:", error);
                 } finally {
@@ -80,60 +63,37 @@ const Callback = () => {
         getAccessToken();
     }, []);
 
-    const fetchPlaylistsByGenre = async (selectedGenres) => {
-        setLoading(true);
-        const token = localStorage.getItem("access_token");
-
-        try {
-            const playlists = {};
-            for (const genre of selectedGenres) {
-                const genreResponse = await fetch(`https://api.spotify.com/v1/browse/categories/${genre}/playlists`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
-
-                if (genreResponse.ok) {
-                    const genreData = await genreResponse.json();
-                    playlists[genre] = genreData.playlists.items.slice(0, 5); // Get only top 5 playlists
-                } else {
-                    console.error(`Error fetching playlists for genre ${genre}:`, await genreResponse.json());
-                }
-            }
-            setPlaylistsByGenre(playlists);
-        } catch (error) {
-            console.error("Error fetching playlists:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleGenreSubmit = (selectedGenres) => {
-        fetchPlaylistsByGenre(selectedGenres);
-    };
-
-    const handleMoodSubmit = (mood) => {
-        console.log("User's Mood:", mood);
+    // Function for navigating to the mood form page
+    const handleMoodDetection = () => {
+        navigate("/mood-form");
     };
 
     return (
-        <div>
+        <div className="container mx-auto p-4">
             {userData ? (
                 <div>
+                    {/* Display User Details */}
                     <UserDetails userData={userData} />
-                    <GenreSelect genres={genres} onGenreSubmit={handleGenreSubmit} />
-                    <MoodForm onSubmit={handleMoodSubmit} />
-                    <div>
-                        {Object.keys(playlistsByGenre).length > 0 && (
-                            <div>
-                                {Object.keys(playlistsByGenre).map((genre) => (
-                                    <div key={genre}>
-                                        <h3>Top 5 playlists in {genres.find(g => g.id === genre)?.name}</h3>
-                                        <SongsList songs={playlistsByGenre[genre]} selectedGenreName={genres.find(g => g.id === genre)?.name} loading={loading} />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                    
+                    {/* Music Player UI */}
+                    <div className="music-player mt-8 p-4 border rounded shadow-lg bg-white dark:bg-gray-800">
+                        <h2 className="text-lg font-semibold mb-2">Now Playing:</h2>
+                        <p className="text-gray-700 dark:text-gray-300">No song selected.</p>
+                        <audio controls className="w-full mt-2">
+                            {/* Example placeholder song */}
+                            <source src="https://p.scdn.co/mp3-preview/7b9e7a01dbd8b43fbc3cc3e7acb1d1b4e33de86e?cid=774b29d4f13844c495f206cafdad9c86" type="audio/mpeg" />
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+
+                    {/* Button for Mood Detection */}
+                    <div className="mt-4">
+                        <button
+                            onClick={handleMoodDetection}
+                            className="px-6 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition duration-200"
+                        >
+                            Detect Mood
+                        </button>
                     </div>
                 </div>
             ) : (
