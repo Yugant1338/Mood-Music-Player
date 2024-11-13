@@ -48,3 +48,8 @@
 /* .navbar_login{
   font-size: 14px;
 } */
+.genreImg{
+  border-radius: 50%;
+  height: 110px;
+  width: 110px;
+}

@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
+import "../App.css"
 const MoodFormPage = () => {
     const [genres, setGenres] = useState([]);
     const [selectedGenres, setSelectedGenres] = useState([]); // Stores selected genre IDs
-    const [selectedGenreNames, setSelectedGenreNames] = useState([]); // Stores selected genre names
-    const [songs, setSongs] = useState({});
+    const [genrePlaylistPairs, setGenrePlaylistPairs] = useState([]); // Pairs genre names with playlists
     const [loading, setLoading] = useState(false);
     const [answers, setAnswers] = useState({
         mood: "",
@@ -13,8 +12,27 @@ const MoodFormPage = () => {
         energyLevel: 50, // Default slider value for energy level
         moodLevel: 50,   // Default slider value for mood level
     });
+    const constGenres = [
+        { id: "", genre: "Pop" },
+        { id: "", genre: "Party" },
+        { id: "", genre: "Summer" },
+        { id: "", genre: "Charts" },
+        { id: "", genre: "Discover" }
+    ];
     const [submittedAnswers, setSubmittedAnswers] = useState(null); // To store submitted answers
     const navigate = useNavigate();
+    
+    const pairIdWithGenre = (constGenre) => {
+        for (let genre of genres) {
+            if (genre.name === constGenre) {
+                return genre.id;
+            }
+        }
+    };
+
+    for (let i = 0; i < constGenres.length; i++) {
+        constGenres[i].id = pairIdWithGenre(constGenres[i].genre);
+    }
 
     // Fetch genres from the API
     useEffect(() => {
@@ -42,23 +60,14 @@ const MoodFormPage = () => {
                 ? prevGenres.filter((g) => g !== genre.id)
                 : [...prevGenres, genre.id].slice(0, 3) // Limit to 3 genres
         );
-
-        setSelectedGenreNames((prevGenreNames) => {
-            if (selectedGenres.includes(genre.id)) {
-                // Remove the genre name if already selected
-                return prevGenreNames.filter((name) => name !== genre.name);
-            } else {
-                // Add the genre name if not selected
-                return [...prevGenreNames, genre.name].slice(0, 3); // Limit to 3 genres
-            }
-        });
     };
 
-    // Fetch playlists based on selected genres
-    const fetchPlaylists = async () => {
+    // Fetch playlists and update genrePlaylistPairs on submit
+    const handlePlaylistsSubmit = async () => {
         setLoading(true);
         const token = localStorage.getItem("access_token");
-        const playlists = {};
+        const pairs = [];
+
         for (const genre of selectedGenres) {
             const genreResponse = await fetch(`https://api.spotify.com/v1/browse/categories/${genre}/playlists`, {
                 headers: {
@@ -68,10 +77,34 @@ const MoodFormPage = () => {
 
             if (genreResponse.ok) {
                 const genreData = await genreResponse.json();
-                playlists[genre] = genreData.playlists.items.slice(0, 4);
+                const genreName = genres.find((g) => g.id === genre)?.name;
+                pairs.push({
+                    genreName: genreName || "Unknown Genre",
+                    playlists: genreData.playlists.items.slice(0, 5), // Limit to 5 playlists per genre
+                });
             }
         }
-        setSongs(playlists);
+
+        // Fetch playlists for constGenres
+        for (const genre of constGenres) {
+            if (genre.id) {
+                const genreResponse = await fetch(`https://api.spotify.com/v1/browse/categories/${genre.id}/playlists`, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+
+                if (genreResponse.ok) {
+                    const genreData = await genreResponse.json();
+                    pairs.push({
+                        genreName: genre.genre,
+                        playlists: genreData.playlists.items.slice(0, 5), // Limit to 5 playlists
+                    });
+                }
+            }
+        }
+
+        setGenrePlaylistPairs(pairs);
         setLoading(false);
     };
 
@@ -97,11 +130,6 @@ const MoodFormPage = () => {
     const handleMoodEnergySubmit = (event) => {
         event.preventDefault();
         setSubmittedAnswers(answers); // Store submitted answers in state
-    };
-
-    // Handle form submit for fetching playlists
-    const handlePlaylistsSubmit = () => {
-        fetchPlaylists(); // Fetch playlists based on selected genres
     };
 
     return (
@@ -262,56 +290,56 @@ const MoodFormPage = () => {
                 </form>
             </div>
 
-            {/* Display Submitted Answers */}
+            {/* Display submitted answers */}
             {submittedAnswers && (
-                <div className="mt-8">
-                    <h3 className="text-xl font-semibold">Your Submitted Mood & Energy Answers</h3>
-                    <p><strong>Mood:</strong> {submittedAnswers.mood}</p>
-                    <p><strong>Energy:</strong> {submittedAnswers.energy}</p>
-                    <p><strong>Mood Level:</strong> {submittedAnswers.moodLevel}</p>
-                    <p><strong>Energy Level:</strong> {submittedAnswers.energyLevel}</p>
+                <div className="my-4">
+                    <h4 className="text-lg font-semibold">Your Submitted Answers</h4>
+                    <p>Mood: {submittedAnswers.mood}</p>
+                    <p>Energy: {submittedAnswers.energy}</p>
+                    <p>Mood Level: {submittedAnswers.moodLevel}</p>
+                    <p>Energy Level: {submittedAnswers.energyLevel}</p>
                 </div>
             )}
 
-            {/* Genre Selection */}
-            <div className="mt-4">
-                <h3 className="text-xl font-semibold">Select Genres (Max 3)</h3>
-                <div className="space-y-2">
-                    {genres.map((genre) => (
-                        <label key={genre.id} className="block">
-                            <input
-                                type="checkbox"
-                                value={genre.id}
-                                onChange={() => handleGenreSelect(genre)}
-                                checked={selectedGenres.includes(genre.id)}
-                                disabled={selectedGenres.length >= 3 && !selectedGenres.includes(genre.id)}
-                                className="mr-2"
-                            />
-                            {genre.name}
-                        </label>
-                    ))}
-                </div>
+            {/* Select genres */}
+            <h3 className="text-xl font-semibold mb-4">Select up to 3 Genres</h3>
+            <div className="flex flex-wrap gap-5 mb-4">
+                {genres.map((genre) => (
+                    <button
+                        key={genre.id}
+                        className={`p-2 rounded-md font-medium ${
+                            selectedGenres.includes(genre.id) ? "bg-blue-500 text-white=" : "bg-gray-200 text-black"
+                        }`}
+                        onClick={() => handleGenreSelect(genre)}
+                    >
+                        <img className = "genreImg" src={genre.icons[0].url}/>
+                        {genre.name}
+                    </button>
+                ))}
             </div>
 
-            {/* Submit Button for Playlists */}
+            {/* Submit button for playlist */}
             <button
-                type="button"
                 onClick={handlePlaylistsSubmit}
-                className="mt-4 p-2 bg-green-500 text-white font-semibold rounded-md hover:bg-green-600"
+                className="p-2 bg-green-500 text-white font-semibold rounded-md hover:bg-green-600"
+                disabled={selectedGenres.length === 0 || loading}
             >
-                Show Playlist Based on Genres
+                {loading ? "Loading..." : "Submit for Playlists"}
             </button>
 
-            {/* Display Playlists */}
-            {!loading && Object.keys(songs).length > 0 && (
-                <div className="mt-4">
-                    <h3 className="text-xl font-semibold">Your Playlist Suggestions</h3>
-                    {selectedGenreNames.map((genreName, index) => (
-                        <div key={index} className="my-4">
-                            <h4 className="font-semibold">{genreName}</h4>
+            {/* Display genre and playlists */}
+            {genrePlaylistPairs.length > 0 && (
+                <div className="my-8">
+                    {genrePlaylistPairs.map((pair, index) => (
+                        <div key={index} className="mb-4">
+                            <h4 className="text-lg font-semibold">{pair.genreName} Playlists</h4>
                             <ul>
-                                {songs[selectedGenres[index]]?.map((song, idx) => (
-                                    <li key={idx}>{song.name}</li>
+                                {pair.playlists.map((playlist, i) => (
+                                    <li key={i} className="text-blue-700">
+                                        <a href={playlist.external_urls.spotify} target="_blank" rel="noopener noreferrer">
+                                            {playlist.name}
+                                        </a>
+                                    </li>
                                 ))}
                             </ul>
                         </div>
